@@ -164,6 +164,12 @@ bool D3D11Backend::Validate(const Frame& frame) const
     if (!frame.color || !frame.depth || !frame.motion || frame.color == m_output.Get() ||
         !std::isfinite(frame.jitter.x) || !std::isfinite(frame.jitter.y) ||
         !std::isfinite(frame.deltaMilliseconds) || frame.deltaMilliseconds < 0) return false;
+    // A D3D11 proxy such as ReShade wraps the device but not the resources it
+    // creates, so inputs report the underlying device. Compare against the device
+    // our own output texture reports instead of the (possibly proxied) m_device.
+    if (!m_output) return false;
+    ComPtr<ID3D11Device> resourceDevice;
+    m_output->GetDevice(&resourceDevice);
     for (auto* input : {frame.color, frame.depth, frame.motion})
     {
         D3D11_TEXTURE2D_DESC desc;
@@ -172,7 +178,7 @@ bool D3D11Backend::Validate(const Frame& frame) const
             desc.ArraySize != 1 || !(desc.BindFlags & D3D11_BIND_SHADER_RESOURCE)) return false;
         ComPtr<ID3D11Device> device;
         input->GetDevice(&device);
-        if (device.Get() != m_device.Get()) return false;
+        if (device.Get() != resourceDevice.Get()) return false;
     }
     D3D11_TEXTURE2D_DESC depth, motion;
     frame.depth->GetDesc(&depth);

@@ -157,13 +157,19 @@ bool D3D11Backend::Validate(const Frame& frame) const
         !std::isfinite(frame.cameraNear) || !std::isfinite(frame.cameraFar) ||
         !std::isfinite(frame.verticalFov) || frame.cameraNear <= 0 || frame.cameraFar <= frame.cameraNear ||
         frame.verticalFov <= 0 || frame.verticalFov >= 3.141593f) return false;
+    // A D3D11 proxy such as ReShade wraps the device but not the resources it
+    // creates, so inputs report the underlying device. Compare against the device
+    // our own output texture reports instead of the (possibly proxied) m_device.
+    if (!m_output) return false;
+    ComPtr<ID3D11Device> resourceDevice;
+    m_output->GetDevice(&resourceDevice);
     for (auto* input : {frame.color, frame.depth, frame.motion})
     {
         D3D11_TEXTURE2D_DESC desc;
         input->GetDesc(&desc);
         ComPtr<ID3D11Device> device;
         input->GetDevice(&device);
-        if (device.Get() != m_device.Get() || desc.Width != m_render.width || desc.Height != m_render.height ||
+        if (device.Get() != resourceDevice.Get() || desc.Width != m_render.width || desc.Height != m_render.height ||
             desc.SampleDesc.Count != 1 || desc.ArraySize != 1 || !(desc.BindFlags & D3D11_BIND_SHADER_RESOURCE)) return false;
     }
     D3D11_TEXTURE2D_DESC depth, motion;

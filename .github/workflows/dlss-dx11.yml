@@ -1,0 +1,35 @@
+name: Build DX11 exes (DLSS)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "reshade-proxy-device-fix" ]
+
+env:
+  SOLUTION_FILE_PATH: src/engine-vs2022.sln
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        buildconf: ["DX11", "DX11-AVX"]
+    steps:
+    - uses: al-cheb/configure-pagefile-action@v1.3
+      with:
+        minimum-size: 8GB
+        maximum-size: 8GB
+        disk-root: "C:"
+    - uses: actions/checkout@v4
+    - uses: snickerbockers/submodules-init@v4
+    - uses: microsoft/setup-msbuild@v1.3.1
+      with:
+        msbuild-architecture: "x64"
+    - name: Build ${{matrix.buildconf}}
+      run: msbuild /m /p:Configuration=${{matrix.buildconf}} ${{env.SOLUTION_FILE_PATH}}
+    - uses: actions/upload-artifact@v4.6.0
+      with:
+        name: ${{matrix.buildconf}}_exe
+        path: ./_build/_game/bin_dbg/*.exe
+        if-no-files-found: "error"
+        retention-days: 7
